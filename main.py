@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 import os
 import openai
+import tkinter as tk
+from tkinter import ttk, scrolledtext
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -8,6 +10,11 @@ load_dotenv()
 # Access the API key
 api_key = os.getenv("OPENAI_API_KEY")
 openai.api_key = api_key
+
+# Check to see if the .env file is configured properly
+if not api_key:
+    print("Error: API key not found. Make sure your .env file is correctly configured.")
+    exit(1)
 
 # Define the system prompt
 system_prompt = (
@@ -18,20 +25,17 @@ system_prompt = (
     "to Windows 11 issues.' Always maintain a friendly and professional tone."
 )
 
-# Infinite loop for user interaction
-print(f"API Key: {api_key[:5]}...")
-print("Welcome to Justin's Windows 11 Assistant! Type 'exit' to quit.\n")
-while True:
-    # Get user input
-    user_query = input("What Windows 11 issue can I help you with? (type 'exit' to quit): ")
-
-    # Check for exit condition
-    if user_query.lower() == 'exit':
-        print("Goodbye! If you have more Windows 11 issues, feel free to ask again.")
-        break
+# Function to handle user queries
+def get_response(event=None):
+    user_query = user_input.get().strip()
+    if not user_query:
+        display_message("Please enter a valid query.", "system")
+        return
+    
+    display_message(user_query, "user")  # Display the query
+    user_input.delete(0, tk.END)  # Clear the field
 
     try:
-        # Use the new OpenAI ChatCompletion interface
         response = openai.chat.completions.create(
             model="gpt-4o-mini",  # Use GPT-4 or GPT-4o-mini
             messages=[
@@ -41,11 +45,95 @@ while True:
             temperature=0.2,  # Low randomness for consistent answers
             max_tokens=200  # Adjust for detailed yet concise answers
         )
-
-        # Extract and display the assistant's response
         assistant_reply = response.choices[0].message.content
-        print(f"\nJustin's Windows 11 Assistant: {assistant_reply}\n")
-
+        display_message(assistant_reply, "assistant")  # Display the assistant's reply
     except Exception as e:
-        # Handle API errors and display the actual exception
-        print(f"\nSorry, I encountered an issue processing your request. Error details: {e}\n")
+        display_message(f"Error: {e}", "system")  # Handle errors gracefully
+
+
+# Function to display messages in the chat area
+def display_message(message, sender):
+    # Frame for the message
+    frame = tk.Frame(chat_area, bg="#f5f5f5", pady=5, padx=5)
+
+    # Determine alignment and colors based on sender
+    if sender == "user":
+        anchor = "e"
+        bubble_color = "#e2e3e5"  # Light gray for user
+    elif sender == "assistant":
+        anchor = "w"
+        bubble_color = "#d1e7dd"  # Light green for assistant
+    else:  # System messages
+        anchor = "w"
+        bubble_color = "#f8d7da"  # Light red for system errors
+
+    # Create the message bubble
+    bubble = tk.Label(
+        frame,
+        text=message,
+        wraplength=400,
+        justify="left",
+        bg=bubble_color,
+        fg="black",
+        font=("Arial", 10),
+        padx=10,
+        pady=5,
+        relief="solid",
+        bd=1
+    )
+    bubble.pack(side="right" if sender == "user" else "left", padx=5)
+
+    # Add the frame to the chat area
+    frame.pack(anchor=anchor, fill="x", padx=10, pady=2)
+
+    # Auto-scroll to the bottom
+    chat_canvas.update_idletasks()
+    chat_canvas.yview_moveto(1.0)
+
+# Initialize the GUI
+root = tk.Tk()
+root.title("Justin's Windows 11 Assistant")
+root.geometry("500x600")
+root.resizable(False, False)
+
+# Chat area frame
+chat_frame = tk.Frame(root, bg="#f5f5f5", relief="solid", bd=1)
+chat_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+# Scrollable canvas for chat messages
+chat_canvas = tk.Canvas(chat_frame, bg="#f5f5f5")
+chat_scroll = ttk.Scrollbar(chat_frame, orient="vertical", command=chat_canvas.yview)
+chat_area = tk.Frame(chat_canvas, bg="#f5f5f5")
+
+# Configure scrollable chat area
+chat_area.bind("<Configure>", lambda e: chat_canvas.configure(scrollregion=chat_canvas.bbox("all")))
+chat_canvas.create_window((0, 0), window=chat_area, anchor="nw")
+chat_canvas.configure(yscrollcommand=chat_scroll.set)
+
+chat_canvas.pack(side="left", fill="both", expand=True)
+chat_scroll.pack(side="right", fill="y")
+
+# Input area frame
+input_frame = tk.Frame(root, bg="#f5f5f5", pady=5)
+input_frame.pack(fill="x", padx=10, pady=5)
+
+# Input box
+user_input = tk.Entry(input_frame, font=("Arial", 12), relief="solid", bd=1)
+user_input.pack(side="left", fill="x", expand=True, padx=(0, 10))
+user_input.bind("<Return>", get_response)  # Bind Enter key to submit
+
+# Send button
+send_btn = tk.Button(
+    input_frame,
+    text="Send",
+    command=get_response,
+    font=("Arial", 10),
+    bg="#007bff",
+    fg="white",
+    relief="solid",
+    bd=1
+)
+send_btn.pack(side="right")
+
+# Run the GUI
+root.mainloop()
